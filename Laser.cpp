@@ -129,7 +129,7 @@ void limitLaserPower() {
         /* code */
       }
       
-      abs(currentLaserPowerRgb - (currentLaserPowerRgb[i] / 4))
+      abs(currentLaserPowerRgb - (currentLaserPowerRgb[i] / 4));
     }
   }
   

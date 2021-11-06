@@ -1,23 +1,7 @@
-// See LICENSE file for details
-// Copyright 2016 Florian Link (at) gmx.de
-#if !(defined(__IMXRT1062__) && defined(ARDUINO_TEENSY41))
-  #error This is designed only for Teensy 4.1. Please check your Tools-> Boards
-#endif
-
-#define WEBSOCKETS_USE_ETHERNET     true
-#define USE_NATIVE_ETHERNET         true
-
-#include <WebSockets2_Generic.h>
-
-using namespace websockets2_generic;
-
 #include "Laser.h"
-const byte maxClients = 4;
+#include <NativeEthernet.h>
 
 byte mac[6];
-const uint16_t port = 81;
-WebsocketsClient clients[maxClients];
-WebsocketsServer server;
 
 void teensyMAC(uint8_t *mac) {
   for (uint8_t by = 0; by < 2; by++) mac[by] = (HW_OCOTP_MAC1 >> ((1 - by) * 8)) & 0xFF;
@@ -25,12 +9,27 @@ void teensyMAC(uint8_t *mac) {
 }
 
 Laser laser;
+IPAddress ip(192, 168, 1, 177);
+EthernetServer server(80);
+boolean alreadyConnected = false; // whether or not the client was connected previously
 
 void setup()
 {
+  // Set the MAC address.
   teensyMAC(mac);
-  Ethernet.begin(mac);
-  server.listen(port);
+  Ethernet.begin(mac, ip);
+
+  // Check for Ethernet hardware present
+  if (Ethernet.hardwareStatus() == EthernetNoHardware) {
+    while (true) {
+      delay(1); // do nothing, no point running without Ethernet hardware
+    }
+  }
+  if (Ethernet.linkStatus() == LinkOFF) {
+    // implement code
+  }
+
+  server.begin();
 
   laser.init();
   laser.setScale(1);
@@ -56,7 +55,7 @@ void executeActionsByMessage(String data) {
 
   switch (firstChar) {
     case 'r':
-      
+
       break;
     case 'g':
       // statements
@@ -73,49 +72,20 @@ void executeActionsByMessage(String data) {
   }
 }
 
-void handleMessage(WebsocketsClient &client, WebsocketsMessage message)
-{
-  auto data = message.data();
-}
-
-int8_t getFreeClientIndex()
-{
-  // If a client in our list is not available, it's connection is closed and we
-  // can use it for a new client.
-  for (byte i = 0; i < maxClients; i++)
-  {
-    if (!clients[i].available())
-      return i;
-  }
-
-  return -1;
-}
-
-void listenForClients()
-{
-  if (server.poll())
-  {
-    int8_t freeIndex = getFreeClientIndex();
-
-    if (freeIndex >= 0)
-    {
-      WebsocketsClient newClient = server.accept();
-      newClient.onMessage(handleMessage);
-      clients[freeIndex] = newClient;
-    }
-  }
-}
-
-void pollClients()
-{
-  for (byte i = 0; i < maxClients; i++)
-  {
-    clients[i].poll();
-  }
-}
-
 void loop()
 {
-  listenForClients();
-  pollClients();
+  // wait for a new client:
+  EthernetClient client = server.available();
+
+  // when the client sends the first byte, say hello:
+  if (client) {
+    while (client.connected()) {
+
+      while (client.available() > 0) {
+        char c = client.read();
+      }
+    }
+
+    client.stop();
+  }
 }
