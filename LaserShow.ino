@@ -71,42 +71,51 @@ void executeJson(String json)
   //laser.sendTo(x, y);
 }
 
-void handleMessages(EthernetClient client)
+void decodeAndExecuteCommands(EthernetClient client)
 {
   String json = "";
   while (client.available() > 0)
   {
-    char c = client.read();
-    switch (c)
+    char receivedCharacter = client.read();
+    switch (receivedCharacter)
     {
-      case '{':
-        messageStarted = true;
-        break;
-      case '}':
-        messageStarted = false;
-        executeJson(json);
-        json = "";
-        break;
-      default:
-        json += c;
-        break;
+    case '{':
+      messageStarted = true;
+      break;
+    case '}':
+      messageStarted = false;
+      executeJson(json);
+      json = "";
+      break;
+    default:
+      json += receivedCharacter;
+      break;
     }
+  }
+}
+
+void handleEthernetServer()
+{
+  EthernetClient client = server.available();
+  if (client)
+  {
+    while (client.connected())
+    {
+      decodeAndExecuteCommands(client);
+    }
+
+    client.stop();
   }
 }
 
 void loop()
 {
-  // wait for a new client:
-  EthernetClient client = server.available();
-
-  // when the client sends the first byte, say hello:
-  if (client)
+  laser.executeIntervalChecks();
+  if (laser.emergencyModeActive())
   {
-    while (client.connected())
-    {
-      handleMessages(client);
-    }
-
-    client.stop();
+    laser.executeIntervalChecks();
+    return;
   }
+
+  handleEthernetServer();
 }

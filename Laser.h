@@ -34,99 +34,143 @@
 //! Encapsulates the laser movement and on/off state.
 class Laser
 {
-  public:
-    Laser();
+public:
+  Laser();
 
-    void init();
+  void init();
 
-    //! send the laser to the given position, scaled and translated and line clipped.
-    void sendTo(short x, short y);
-    //! sends the laser to the raw position (the movement is always linearly interpolated depending on the quality,
-    //! to avoid too fast movements.
-    void sendtoRaw(long x, long y);
+  //! send the laser to the given position, scaled and translated and line clipped.
+  void sendTo(short x, short y);
+  //! sends the laser to the raw position (the movement is always linearly interpolated depending on the quality,
+  //! to avoid too fast movements.
+  void sendtoRaw(long x, long y);
 
-    void setLaserPower(short red, short green, short blue);
-    void turnLasersOff();
+  void setLaserPower(short red, short green, short blue);
+  void turnLasersOff();
 
-    void setScale(float scale);
-    void setOffset(long offsetX, long offsetY);
+  void setScale(float scale);
+  void setOffset(long offsetX, long offsetY);
 
-    void resetClipArea();
-    void setClipArea(long x, long y, long x1, long y1);
+  void resetClipArea();
+  void setClipArea(long x, long y, long x1, long y1);
 
-    void resetMaxMove()
-    {
-      _maxMove = -1;
-      _laserForceOff = false;
-    }
-    void setMaxMove(long length)
-    {
-      _moved = 0;
-      _maxMove = length;
-      _laserForceOff = false;
-    }
-    bool maxMoveReached()
-    {
-      return _laserForceOff;
-    }
-    void getMaxMoveFinalPosition(long &x, long &y)
-    {
-      x = _maxMoveX;
-      y = _maxMoveY;
-    }
+  void resetMaxMove()
+  {
+    _maxMove = -1;
+    _laserForceOff = false;
+  }
+  void setMaxMove(long length)
+  {
+    _moved = 0;
+    _maxMove = length;
+    _laserForceOff = false;
+  }
+  bool maxMoveReached()
+  {
+    return _laserForceOff;
+  }
+  void getMaxMoveFinalPosition(long &x, long &y)
+  {
+    x = _maxMoveX;
+    y = _maxMoveY;
+  }
 
-    void setEnable3D(bool flag)
-    {
-      _enable3D = flag;
-    }
-    void setMatrix(const Matrix3 &matrix)
-    {
-      _matrix = matrix;
-    }
-    void setZDist(long dist)
-    {
-      _zDist = dist;
-    }
+  void setEnable3D(bool flag)
+  {
+    _enable3D = flag;
+  }
+  void setMatrix(const Matrix3 &matrix)
+  {
+    _matrix = matrix;
+  }
+  void setZDist(long dist)
+  {
+    _zDist = dist;
+  }
 
-  private:
-    //! send X/Y to DAC
-    void sendToDAC(int x, int y);
+  bool emergencyModeActive()
+  {
+    return _emergencyModeActive;
+  }
 
-    //! computes the out code for line clipping
-    int computeOutCode(long x, long y);
-    //! returns if the line should be drawn, clips line to clip area
-    bool clipLine(long &x0, long &y0, long &x1, long &y1);
-    void preventHotSpotsAndStaticBeams();
+  void executeIntervalChecks();
+  void executeHealthCheck();
 
-    short checkYAxisBoundary(short y);
+private:
+  //! send X/Y to DAC
+  void sendToDAC(int x, int y);
+  //! computes the out code for line clipping
+  int computeOutCode(long x, long y);
+  //! returns if the line should be drawn, clips line to clip area
+  bool clipLine(long &x0, long &y0, long &x1, long &y1);
+  void preventHotSpotsAndStaticBeams();
+  void emergencyMode();
+  bool temperatureToHigh();
+  void limitLaserPower();
+  bool numberIsBetween(int value, int min, int max);
+  void setSolenoid(bool state);
+  void laserSafetyChecks();
+  short fixBoundary(short input, short min, short max);
+  void audienceScanCheck();
+  void testGalvo();
+  void testTemperatureSensors();
+  bool galvoIsMoving();
+  float getGalvoTemperature();
+  float getFirstFloorTemperature();
+  float getSecondFloorTemperature();
+  int getXGalvoRealPosition();
+  int getYGalvoRealPosition();
 
-    FIXPT _quality;
+  bool _emergencyModeActive = false;
+  String _emergencyModeActiveReason = "";
+  short _currentLaserPowerRgb[3] = {0, 0, 0};           // rgb
+  const short _maxPowerInAudienceRgb[3] = {25, 25, 25}; // rgb
 
-    long _x;
-    long _y;
-    int _state;
+  const short _xGalvoPositionsLength = 50; // this value must be the same as the yGalvoPositionsLength variable!
+  const short _yGalvoPositionsLength = 50; // this value must be the same as the yGalvoPositionsLength variable!
 
-    FIXPT _scale;
-    long _offsetX;
-    long _offsetY;
+  short _xGalvoPositions[50]; // the size value must be the same as the yGalvoPositionsLength variable!
+  short _yGalvoPositions[50]; // the size value must be the same as the xGalvoPositionsLength variable!
 
-    long _moved;
-    long _maxMove;
-    bool _laserForceOff;
-    long _maxMoveX;
-    long _maxMoveY;
+  unsigned long _previousInterval;
+  unsigned long _latestGalvoMovement;
 
-    long _oldX;
-    long _oldY;
+  unsigned long _previousMillis;
 
-    long _clipXMin;
-    long _clipYMin;
-    long _clipXMax;
-    long _clipYMax;
+  short _yPos = 0;
+  short _xPos = 0;
 
-    bool _enable3D;
-    Matrix3 _matrix;
-    long _zDist;
+  // values from the feedback signal of the galvo
+  short _realYPos = 0;
+  short _realXPos = 0;
+
+  FIXPT _quality;
+
+  long _x;
+  long _y;
+  int _state;
+
+  FIXPT _scale;
+  long _offsetX;
+  long _offsetY;
+
+  long _moved;
+  long _maxMove;
+  bool _laserForceOff;
+  long _maxMoveX;
+  long _maxMoveY;
+
+  long _oldX;
+  long _oldY;
+
+  long _clipXMin;
+  long _clipYMin;
+  long _clipXMax;
+  long _clipYMax;
+
+  bool _enable3D;
+  Matrix3 _matrix;
+  long _zDist;
 };
 
 #endif

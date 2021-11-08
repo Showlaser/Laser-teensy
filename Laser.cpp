@@ -12,24 +12,6 @@
 #include "DAC_MCP4X.h"
 MCP4X dac;
 
-short currentLaserPowerRgb[3] = {0, 0, 0};           // rgb
-const short maxPowerInAudienceRgb[3] = {25, 25, 25}; // rgb
-
-const short xGalvoPositionsLength = 50; // this value must be the same as the yGalvoPositionsLength variable!
-const short yGalvoPositionsLength = 50; // this value must be the same as the yGalvoPositionsLength variable!
-
-short xGalvoPositions[50]; // the size value must be the same as the yGalvoPositionsLength variable!
-short yGalvoPositions[50]; // the size value must be the same as the xGalvoPositionsLength variable!
-
-unsigned long previousInterval;
-
-short yPos = 0;
-short xPos = 0;
-
-// values from the feedback signal of the galvo
-short realYPos = 0;
-short realXPos = 0;
-
 void turnLasersOff();
 
 Laser::Laser()
@@ -123,18 +105,17 @@ void fillArray(short arrayToFill[], int arrayLength, short value)
 /**
    @brief limits the laser power to reach below the set maxPowerInAudienceRgb.
 */
-void limitLaserPower()
+void Laser::limitLaserPower()
 {
   for (int i = 0; i < 3; i++)
   {
-    const short currentLaserPower = currentLaserPowerRgb[i];
-    const short maxLaserPower = maxPowerInAudienceRgb[i];
+    const short currentLaserPower = _currentLaserPowerRgb[i];
+    const short maxLaserPower = _maxPowerInAudienceRgb[i];
 
     if (currentLaserPower > maxLaserPower)
     {
-      short newPowerValue = currentLaserPowerRgb[i];
-
-      while (newPowerValue > maxPowerInAudienceRgb)
+      short newPowerValue = _currentLaserPowerRgb[i];
+      while (newPowerValue > _maxPowerInAudienceRgb)
       {
         newPowerValue = abs(newPowerValue - (newPowerValue / 4));
       }
@@ -142,28 +123,122 @@ void limitLaserPower()
   }
 }
 
-void audienceScanCheck()
+float Laser::getGalvoTemperature()
 {
-  if (yPos < 0)
+  return analogRead(21) * 0.8;
+}
+
+float Laser::getFirstFloorTemperature()
+{
+  return analogRead(20) * 0.8;
+}
+
+float Laser::getSecondFloorTemperature()
+{
+  return analogRead(19) * 0.8;
+}
+
+int Laser::getXGalvoRealPosition()
+{
+  return analogRead(A16);
+}
+
+int Laser::getYGalvoRealPosition()
+{
+  return analogRead(A17);
+}
+
+void Laser::setSolenoid(bool state)
+{
+  digitalWrite(14, state);
+}
+
+/**
+ * @brief sets the laser in a safe state
+ * 
+ */
+void Laser::emergencyMode()
+{
+  setSolenoid(LOW);
+  turnLasersOff();
+}
+
+bool Laser::temperatureToHigh()
+{
+  float firstFloorTemp = getFirstFloorTemperature();
+  float secondFloorTemp = getSecondFloorTemperature();
+  float galvoTemp = getGalvoTemperature();
+
+  const float maxTemp = 50;
+  return firstFloorTemp < maxTemp && secondFloorTemp < maxTemp && galvoTemp < maxTemp;
+}
+
+void Laser::executeHealthCheck()
+{
+  testGalvo();
+  testTemperatureSensors();
+}
+
+void Laser::testTemperatureSensors()
+{
+  float firstFloorTemp = getFirstFloorTemperature();
+  float secondFloorTemp = getSecondFloorTemperature();
+  float galvoTemp = getGalvoTemperature();
+
+  int strangeValueThreshold = 99;
+  if (firstFloorTemp >= strangeValueThreshold && secondFloorTemp >= strangeValueThreshold && galvoTemp >= strangeValueThreshold)
+  {
+    _emergencyModeActive = true;
+    _emergencyModeActiveReason = "Temperature sensor not working";
+  }
+}
+
+void Laser::testGalvo()
+{
+  sendTo(-4000, -4000);
+  delayMicroseconds(600);
+  int xPosition = getXGalvoRealPosition();
+  int yPosition = getYGalvoRealPosition();
+
+  sendTo(4000, 4000);
+  delayMicroseconds(600);
+  int xPosition2 = getXGalvoRealPosition();
+  int yPosition2 = getYGalvoRealPosition();
+
+  if (xPosition == xPosition2 || yPosition == yPosition2)
+  {
+    _emergencyModeActive = true;
+    _emergencyModeActiveReason = "Galvo not moving";
+  }
+}
+
+void Laser::executeIntervalChecks()
+{
+  unsigned long currentMillis = millis();
+  if (currentMillis - _previousMillis > 100)
+  {
+    _previousMillis = currentMillis;
+    if (temperatureToHigh())
+    {
+      _emergencyModeActive = true;
+    }
+  }
+  if (currentMillis - _previousMillis > 10)
+  {
+  }
+}
+
+void Laser::audienceScanCheck()
+{
+  if (_yPos < 0)
   {
     limitLaserPower();
   }
 }
 
-bool numberIsBetween(int value, int min, int max)
+bool Laser::numberIsBetween(int value, int min, int max)
 {
   return value >= min && value <= max;
-}
-
-void turnLasersOff()
-{
-  analogWrite(redLaserPin, 0);
-  analogWrite(greenLaserPin, 0);
-  analogWrite(blueLaserPin, 0);
-
-  currentLaserPowerRgb[0] = 0;
-  currentLaserPowerRgb[1] = 0;
-  currentLaserPowerRgb[2] = 0;
 }
 
 /**
@@ -176,35 +251,35 @@ void Laser::turnLasersOff()
   analogWrite(greenLaserPin, 0);
   analogWrite(blueLaserPin, 0);
 
-  currentLaserPowerRgb[0] = 0;
-  currentLaserPowerRgb[1] = 0;
-  currentLaserPowerRgb[2] = 0;
+  _currentLaserPowerRgb[0] = 0;
+  _currentLaserPowerRgb[1] = 0;
+  _currentLaserPowerRgb[2] = 0;
 }
 
 /**
    @brief if so the output of the lasers will be reduced, to prevent the beam from burning in objects
 */
-void preventHotSpotsAndStaticBeams()
+void Laser::preventHotSpotsAndStaticBeams()
 {
   unsigned long currentMillis = millis();
 
   // how much non default values are in arrays
-  const int xArrayItemCount = xGalvoPositionsLength - occurrencesInArray(xGalvoPositions, xGalvoPositionsLength, 4001);
-  const int yArrayItemCount = yGalvoPositionsLength - occurrencesInArray(yGalvoPositions, yGalvoPositionsLength, 4001);
+  const int xArrayItemCount = _xGalvoPositionsLength - occurrencesInArray(_xGalvoPositions, _xGalvoPositionsLength, 4001);
+  const int yArrayItemCount = _yGalvoPositionsLength - occurrencesInArray(_yGalvoPositions, _yGalvoPositionsLength, 4001);
 
-  xGalvoPositions[xArrayItemCount + 1] = xPos;
-  yGalvoPositions[yArrayItemCount + 1] = yPos;
+  _xGalvoPositions[xArrayItemCount + 1] = _xPos;
+  _yGalvoPositions[yArrayItemCount + 1] = _yPos;
 
-  if (currentMillis - previousInterval > xGalvoPositionsLength || xArrayItemCount >= xGalvoPositionsLength || yArrayItemCount >= xGalvoPositionsLength)
+  if (currentMillis - _previousInterval > _xGalvoPositionsLength || xArrayItemCount >= _xGalvoPositionsLength || yArrayItemCount >= _xGalvoPositionsLength)
   {
     // fill arrays with default values
-    fillArray(xGalvoPositions, xGalvoPositionsLength, 4001);
-    fillArray(yGalvoPositions, yGalvoPositionsLength, 4001);
-    previousInterval = currentMillis;
+    fillArray(_xGalvoPositions, _xGalvoPositionsLength, 4001);
+    fillArray(_yGalvoPositions, _yGalvoPositionsLength, 4001);
+    _previousInterval = currentMillis;
   }
 
-  int occurrencesX = occurrencesInArray(xPos, xGalvoPositionsLength, xGalvoPositions);
-  int occurrencesY = occurrencesInArray(yPos, yGalvoPositionsLength, yGalvoPositions);
+  int occurrencesX = occurrencesInArray(_xPos, _xGalvoPositionsLength, _xGalvoPositions);
+  int occurrencesY = occurrencesInArray(_yPos, _yGalvoPositionsLength, _yGalvoPositions);
 
   int maxOccurrences = 8;
 
@@ -225,7 +300,7 @@ void preventHotSpotsAndStaticBeams()
    @brief this function calls other functions to check if the laser is operating in a safe way
 
 */
-void laserSafetyChecks()
+void Laser::laserSafetyChecks()
 {
   preventHotSpotsAndStaticBeams();
   audienceScanCheck();
@@ -240,9 +315,9 @@ void laserSafetyChecks()
 */
 void Laser::setLaserPower(short r, short g, short b)
 {
-  currentLaserPowerRgb[0] = r;
-  currentLaserPowerRgb[1] = g;
-  currentLaserPowerRgb[2] = b;
+  _currentLaserPowerRgb[0] = r;
+  _currentLaserPowerRgb[1] = g;
+  _currentLaserPowerRgb[2] = b;
 
   laserSafetyChecks();
 
@@ -259,7 +334,7 @@ void Laser::setLaserPower(short r, short g, short b)
    @param max the maximum allowed value
    @return short the value between or equal to the min or max value
 */
-short fixBoundary(short input, short min, short max)
+short Laser::fixBoundary(short input, short min, short max)
 {
   if (input < min)
   {
@@ -280,16 +355,14 @@ short fixBoundary(short input, short min, short max)
 */
 void Laser::sendTo(short xpos, short ypos)
 {
-  xpos = fixBoundary(xpos, -4000, 4000);
-  ypos = fixBoundary(ypos, -4000, 4000);
+  _xPos = fixBoundary(xpos, -4000, 4000);
+  _yPos = fixBoundary(ypos, -4000, 4000);
 
-  long xNew = TO_INT(xpos * _scale) + _offsetX;
-  long yNew = TO_INT(ypos * _scale) + _offsetY;
-
-  yPos = ypos;
-  xPos = xpos;
+  long xNew = TO_INT(_xPos * _scale) + _offsetX;
+  long yNew = TO_INT(_yPos * _scale) + _offsetY;
 
   sendtoRaw(xNew, yNew);
+  _latestGalvoMovement = millis();
   laserSafetyChecks(); // this function is called to check if the new position does not fall in an unsafe zone
 }
 
