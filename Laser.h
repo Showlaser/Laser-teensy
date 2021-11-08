@@ -40,13 +40,13 @@ class Laser
     void init();
 
     //! send the laser to the given position, scaled and translated and line clipped.
-    void sendto(short x, short y);
+    void sendTo(short x, short y);
     //! sends the laser to the raw position (the movement is always linearly interpolated depending on the quality,
     //! to avoid too fast movements.
     void sendtoRaw(long x, long y);
 
-    void on(byte red, byte green, byte blue);
-    void off();
+    void setLaserPower(short red, short green, short blue);
+    void turnLasersOff();
 
     void setScale(float scale);
     void setOffset(long offsetX, long offsetY);
@@ -54,30 +54,37 @@ class Laser
     void resetClipArea();
     void setClipArea(long x, long y, long x1, long y1);
 
-    void resetMaxMove() {
+    void resetMaxMove()
+    {
       _maxMove = -1;
       _laserForceOff = false;
     }
-    void setMaxMove(long length) {
+    void setMaxMove(long length)
+    {
       _moved = 0;
       _maxMove = length;
       _laserForceOff = false;
     }
-    bool maxMoveReached() {
+    bool maxMoveReached()
+    {
       return _laserForceOff;
     }
-    void getMaxMoveFinalPosition(long &x, long &y) {
+    void getMaxMoveFinalPosition(long &x, long &y)
+    {
       x = _maxMoveX;
       y = _maxMoveY;
     }
 
-    void setEnable3D(bool flag) {
+    void setEnable3D(bool flag)
+    {
       _enable3D = flag;
     }
-    void setMatrix(const Matrix3& matrix) {
+    void setMatrix(const Matrix3 &matrix)
+    {
       _matrix = matrix;
     }
-    void setZDist(long dist) {
+    void setZDist(long dist)
+    {
       _zDist = dist;
     }
 
@@ -88,18 +95,16 @@ class Laser
     //! computes the out code for line clipping
     int computeOutCode(long x, long y);
     //! returns if the line should be drawn, clips line to clip area
-    bool clipLine(long& x0, long& y0, long& x1, long& y1);
+    bool clipLine(long &x0, long &y0, long &x1, long &y1);
     void preventHotSpotsAndStaticBeams();
 
     short checkYAxisBoundary(short y);
-    short checkXAxisBoundary(short x);
 
     FIXPT _quality;
 
-    void turnOnLasers();
     long _x;
     long _y;
-    int  _state;
+    int _state;
 
     FIXPT _scale;
     long _offsetX;

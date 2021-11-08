@@ -12,16 +12,25 @@
 #include "DAC_MCP4X.h"
 MCP4X dac;
 
-byte currentLaserPowerRgb[3] = { 0, 0, 0}; // rgb
-const byte maxPowerInAudienceRgb[3] = { 25, 25, 25 }; // rgb
+short currentLaserPowerRgb[3] = {0, 0, 0};           // rgb
+const short maxPowerInAudienceRgb[3] = {25, 25, 25}; // rgb
 
-short galvoPositionsx[50];
-short galvoPositionsy[50];
+const short xGalvoPositionsLength = 50; // this value must be the same as the yGalvoPositionsLength variable!
+const short yGalvoPositionsLength = 50; // this value must be the same as the yGalvoPositionsLength variable!
+
+short xGalvoPositions[50]; // the size value must be the same as the yGalvoPositionsLength variable!
+short yGalvoPositions[50]; // the size value must be the same as the xGalvoPositionsLength variable!
 
 unsigned long previousInterval;
 
 short yPos = 0;
 short xPos = 0;
+
+// values from the feedback signal of the galvo
+short realYPos = 0;
+short realXPos = 0;
+
+void turnLasersOff();
 
 Laser::Laser()
 {
@@ -89,156 +98,190 @@ void Laser::setClipArea(long x, long y, long x1, long y1)
   _clipYMax = y1;
 }
 
-const int INSIDE = 0; // 0000
-const int LEFT = 1;   // 0001
-const int RIGHT = 2;  // 0010
-const int BOTTOM = 4; // 0100
-const int TOP = 8;    // 1000
+int occurrencesInArray(short arrayToCheck[], int arrayLength, short valueToCheck)
+{
+  int total = 0;
 
-byte occurrencesInArray(short value, short arrayToCheck[]) {
-  byte total = 0;
-
-  for (int i = 0; i < 50; i++)
-    if (arrayToCheck[i] == value) total++;
+  for (int i = 0; i < arrayLength; i++)
+    if (arrayToCheck[i] == valueToCheck)
+    {
+      total++;
+    }
 
   return total;
 }
 
-void fillArray(short arrayToFill[]) {
-  for (int i = 0; i < 50; i++)
-    arrayToFill[i] = 2001;
+// function to fill array with the same data
+void fillArray(short arrayToFill[], int arrayLength, short value)
+{
+  for (int i = 0; i < arrayLength; i++)
+  {
+    arrayToFill[i] = value;
+  }
 }
 
-byte countArrayLenght(short arrayToCount[], short defaultValue) {
-  byte total = 0;
-
-  for (int i = 0; i < 50; i++)
-    if (arrayToCount[i] != defaultValue) total++;
-
-  return total;
-}
-
-void limitLaserPower() {
+/**
+   @brief limits the laser power to reach below the set maxPowerInAudienceRgb.
+*/
+void limitLaserPower()
+{
   for (int i = 0; i < 3; i++)
   {
-    if (currentLaserPowerRgb[i] > maxPowerInAudienceRgb[i]) {
-      byte newPowerValue = currentLaserPowerRgb[i];
+    const short currentLaserPower = currentLaserPowerRgb[i];
+    const short maxLaserPower = maxPowerInAudienceRgb[i];
+
+    if (currentLaserPower > maxLaserPower)
+    {
+      short newPowerValue = currentLaserPowerRgb[i];
 
       while (newPowerValue > maxPowerInAudienceRgb)
       {
-        /* code */
+        newPowerValue = abs(newPowerValue - (newPowerValue / 4));
       }
-      
-      abs(currentLaserPowerRgb - (currentLaserPowerRgb[i] / 4));
-    }
-  }
-  
-
-
-  if (red > maxPowerInAudienceRgb[0]) {
-    red = abs(red - red / 6);
-
-    if (red < maxPowerInAudienceRgb[0]) {
-      red = maxPowerInAudienceRgb[0];
-    } 
-  }
-
-  if (green > maxPowerInAudienceRgb[1]) {
-    green = abs(green - green / 6);
-
-    if (green < maxPowerInAudienceRgb[1]) {
-      green = maxPowerInAudienceRgb[1];
-    }
-  }
-
-  if (blue > maxPowerInAudienceRgb[2]) {
-    blue = abs(blue - blue / 6);
-
-    if (blue < maxPowerInAudienceRgb[2]) {
-      blue = maxPowerInAudienceRgb[2]; 
     }
   }
 }
 
-void audienceScanCheck() {
-  if (yPos < 0) limitLaserPower();
-}
-
-// this function will check if a beam is within the same spot in a certain interval value, if so the output of the lasers will be reduced
-void Laser::preventHotSpotsAndStaticBeams() {
-  unsigned long currentMillis = millis();
-
-  byte xArrayLenght = countArrayLenght(galvoPositionsx, 2001);
-  byte yArrayLenght = countArrayLenght(galvoPositionsy, 2001);
-
-  galvoPositionsx[xArrayLenght + 1] = xPos;
-  galvoPositionsy[yArrayLenght + 1] = yPos;
-
-  if (currentMillis - previousInterval > 50 || xArrayLenght >= 50 || yArrayLenght >= 50) {
-    fillArray(galvoPositionsx);
-    fillArray(galvoPositionsy);
-
-    previousInterval = currentMillis;
-  }
-
-  int occurencesX = occurrencesInArray(xPos, galvoPositionsx);
-  int occurencesY = occurrencesInArray(yPos, galvoPositionsy);
-  
-  if (occurencesX > 3 && occurencesX < 8 && occurencesY > 3 && occurencesY < 8) {
-    limitLaserPower();
-    return;
-  }
-
-  if (occurencesX > 8 && occurencesY > 8) off();
-}
-
-void Laser::turnOnLasers() {
-  //preventHotSpotsAndStaticBeams();
-  audienceScanCheck();
-
-  analogWrite(redLaserPin, red);
-  analogWrite(greenLaserPin, green);
-  analogWrite(blueLaserPin, blue);
-}
-
-void Laser::on(byte r, byte g, byte b)
+void audienceScanCheck()
 {
-  green = g;
-  red = r;
-  blue = b;
-
-  turnOnLasers();
+  if (yPos < 0)
+  {
+    limitLaserPower();
+  }
 }
 
-void Laser::off()
+bool numberIsBetween(int value, int min, int max)
+{
+  return value >= min && value <= max;
+}
+
+void turnLasersOff()
 {
   analogWrite(redLaserPin, 0);
   analogWrite(greenLaserPin, 0);
   analogWrite(blueLaserPin, 0);
 
-  green = 0;
-  red = 0;
-  blue = 0;
+  currentLaserPowerRgb[0] = 0;
+  currentLaserPowerRgb[1] = 0;
+  currentLaserPowerRgb[2] = 0;
 }
 
-short Laser::checkXAxisBoundary(short x) {
-  if (x < -4000) x = -4000;
-  if (x > 4000) x = 4000;
+/**
+   @brief turns off the lasers, can be used in cases of emergencies
 
-  return x;
-}
-
-short Laser::checkYAxisBoundary(short y) {
-  if (y > 4000) y = 4000;
-  if (y < -4000) y = -4000;
-
-  return y;
-}
-
-void Laser::sendto (short xpos, short ypos)
+*/
+void Laser::turnLasersOff()
 {
-  xpos = checkXAxisBoundary(xpos);
-  ypos = checkYAxisBoundary(ypos);
+  analogWrite(redLaserPin, 0);
+  analogWrite(greenLaserPin, 0);
+  analogWrite(blueLaserPin, 0);
+
+  currentLaserPowerRgb[0] = 0;
+  currentLaserPowerRgb[1] = 0;
+  currentLaserPowerRgb[2] = 0;
+}
+
+/**
+   @brief if so the output of the lasers will be reduced, to prevent the beam from burning in objects
+*/
+void preventHotSpotsAndStaticBeams()
+{
+  unsigned long currentMillis = millis();
+
+  // how much non default values are in arrays
+  const int xArrayItemCount = xGalvoPositionsLength - occurrencesInArray(xGalvoPositions, xGalvoPositionsLength, 4001);
+  const int yArrayItemCount = yGalvoPositionsLength - occurrencesInArray(yGalvoPositions, yGalvoPositionsLength, 4001);
+
+  xGalvoPositions[xArrayItemCount + 1] = xPos;
+  yGalvoPositions[yArrayItemCount + 1] = yPos;
+
+  if (currentMillis - previousInterval > xGalvoPositionsLength || xArrayItemCount >= xGalvoPositionsLength || yArrayItemCount >= xGalvoPositionsLength)
+  {
+    // fill arrays with default values
+    fillArray(xGalvoPositions, xGalvoPositionsLength, 4001);
+    fillArray(yGalvoPositions, yGalvoPositionsLength, 4001);
+    previousInterval = currentMillis;
+  }
+
+  int occurrencesX = occurrencesInArray(xPos, xGalvoPositionsLength, xGalvoPositions);
+  int occurrencesY = occurrencesInArray(yPos, yGalvoPositionsLength, yGalvoPositions);
+
+  int maxOccurrences = 8;
+
+  if (numberIsBetween(occurrencesX, 3, maxOccurrences) &&
+      numberIsBetween(occurrencesY, 3, maxOccurrences))
+  {
+    limitLaserPower();
+    return;
+  }
+
+  if (occurrencesX > maxOccurrences && occurrencesY > maxOccurrences)
+  {
+    turnLasersOff();
+  }
+}
+
+/**
+   @brief this function calls other functions to check if the laser is operating in a safe way
+
+*/
+void laserSafetyChecks()
+{
+  preventHotSpotsAndStaticBeams();
+  audienceScanCheck();
+}
+
+/**
+   @brief sets the power of the lasers and checks if the new values are safe
+
+   @param r the power of the red laser
+   @param g the power of the green laser
+   @param b the power of the blue laser
+*/
+void Laser::setLaserPower(short r, short g, short b)
+{
+  currentLaserPowerRgb[0] = r;
+  currentLaserPowerRgb[1] = g;
+  currentLaserPowerRgb[2] = b;
+
+  laserSafetyChecks();
+
+  analogWrite(redLaserPin, r);
+  analogWrite(greenLaserPin, g);
+  analogWrite(blueLaserPin, b);
+}
+
+/**
+   @brief fix the input value if it goes under or over the min and max values.
+
+   @param input the input variable to fix
+   @param min the minimum allowed value
+   @param max the maximum allowed value
+   @return short the value between or equal to the min or max value
+*/
+short fixBoundary(short input, short min, short max)
+{
+  if (input < min)
+  {
+    input = min;
+  }
+  if (input > max)
+  {
+    max = max;
+  }
+  return input;
+}
+
+/**
+   @brief sends the mirrors of the galvo to the specified location
+
+   @param xpos the position of the x mirror in the galvo
+   @param ypos the position of the y mirror in the galvo
+*/
+void Laser::sendTo(short xpos, short ypos)
+{
+  xpos = fixBoundary(xpos, -4000, 4000);
+  ypos = fixBoundary(ypos, -4000, 4000);
 
   long xNew = TO_INT(xpos * _scale) + _offsetX;
   long yNew = TO_INT(ypos * _scale) + _offsetY;
@@ -247,10 +290,10 @@ void Laser::sendto (short xpos, short ypos)
   xPos = xpos;
 
   sendtoRaw(xNew, yNew);
-  turnOnLasers();
+  laserSafetyChecks(); // this function is called to check if the new position does not fall in an unsafe zone
 }
 
-void Laser::sendtoRaw (long xNew, long yNew)
+void Laser::sendtoRaw(long xNew, long yNew)
 {
   // devide into equal parts, using _quality
   long fdiffx = xNew - _x;
@@ -260,7 +303,9 @@ void Laser::sendtoRaw (long xNew, long yNew)
 
   // use the bigger direction
   if (diffx < diffy)
+  {
     diffx = diffy;
+  }
 
   fdiffx = FROM_INT(fdiffx) / diffx;
   fdiffy = FROM_INT(fdiffy) / diffx;
