@@ -35,7 +35,7 @@
 class Laser
 {
 public:
-  Laser();
+  Laser(int redLaserPin, int greenLaserPin, int blueLaserPin, int xGalvoFeedbackPin, int yGalvoFeedbackPin, int solenoidPin);
 
   void init();
 
@@ -53,6 +53,8 @@ public:
 
   void resetClipArea();
   void setClipArea(long x, long y, long x1, long y1);
+
+  void testGalvo();
 
   void resetMaxMove()
   {
@@ -93,44 +95,36 @@ public:
     return _emergencyModeActive;
   }
 
-  void executeIntervalChecks();
-  void executeHealthCheck();
-
 private:
-  //! send X/Y to DAC
-  void sendToDAC(int x, int y);
   //! computes the out code for line clipping
   int computeOutCode(long x, long y);
-  //! returns if the line should be drawn, clips line to clip area
-  bool clipLine(long &x0, long &y0, long &x1, long &y1);
-  void preventHotSpotsAndStaticBeams();
-  void emergencyMode();
-  bool temperatureToHigh();
-  void limitLaserPower();
-  bool numberIsBetween(int value, int min, int max);
-  void setSolenoid(bool state);
-  void laserSafetyChecks();
-  short fixBoundary(short input, short min, short max);
-  void audienceScanCheck();
-  void testGalvo();
-  void testTemperatureSensors();
-  bool galvoIsMoving();
-  float getGalvoTemperature();
-  float getFirstFloorTemperature();
-  float getSecondFloorTemperature();
   int getXGalvoRealPosition();
   int getYGalvoRealPosition();
+  //! returns if the line should be drawn, clips line to clip area
+  bool galvoIsMoving();
+  bool numberIsBetween(int value, int min, int max);
+  bool clipLine(long &x0, long &y0, long &x1, long &y1);
+
+  //! send X/Y to DAC
+  void sendToDAC(int x, int y);
+  void limitLaserPower();
+  void setSolenoid(bool state);
+  void laserSafetyChecks();
+  void audienceScanCheck();
+
+  short fixBoundary(short input, short min, short max);
 
   bool _emergencyModeActive = false;
   String _emergencyModeActiveReason = "";
   short _currentLaserPowerRgb[3] = {0, 0, 0};           // rgb
   const short _maxPowerInAudienceRgb[3] = {25, 25, 25}; // rgb
 
-  const short _xGalvoPositionsLength = 50; // this value must be the same as the yGalvoPositionsLength variable!
-  const short _yGalvoPositionsLength = 50; // this value must be the same as the yGalvoPositionsLength variable!
-
-  short _xGalvoPositions[50]; // the size value must be the same as the yGalvoPositionsLength variable!
-  short _yGalvoPositions[50]; // the size value must be the same as the xGalvoPositionsLength variable!
+  int _redLaserPin = 0;
+  int _greenLaserPin = 0;
+  int _blueLaserPin = 0;
+  int _xGalvoFeedbackPin = 0;
+  int _yGalvoFeedbackPin = 0;
+  int _solenoidPin = 0;
 
   unsigned long _previousInterval;
   unsigned long _latestGalvoMovement;
