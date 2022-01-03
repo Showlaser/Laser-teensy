@@ -189,6 +189,13 @@ void Laser::laserSafetyChecks()
 */
 void Laser::setLaserPower(short r, short g, short b)
 {
+  if (_currentLaserPowerRgb[0] == r &&
+      _currentLaserPowerRgb[1] == g &&
+      _currentLaserPowerRgb[2] == b)
+  {
+    return;
+  }
+
   _currentLaserPowerRgb[0] = r;
   _currentLaserPowerRgb[1] = g;
   _currentLaserPowerRgb[2] = b;
@@ -227,10 +234,16 @@ short Laser::fixBoundary(short input, short min, short max)
    @param xpos the position of the x mirror in the galvo
    @param ypos the position of the y mirror in the galvo
 */
-void Laser::sendTo(short xpos, short ypos)
+void Laser::sendTo(short xPos, short yPos)
 {
-  _xPos = fixBoundary(xpos, -4000, 4000);
-  _yPos = fixBoundary(ypos, -4000, 4000);
+  if (xPos == _xPos &&
+      yPos == _yPos)
+  {
+    return;
+  }
+
+  _xPos = fixBoundary(xPos, -4000, 4000);
+  _yPos = fixBoundary(yPos, -4000, 4000);
 
   long xNew = TO_INT(_xPos * _scale) + _offsetX;
   long yNew = TO_INT(_yPos * _scale) + _offsetY;
