@@ -95,7 +95,7 @@ void executeJson(String json)
 {
   StaticJsonDocument<64> doc;
   deserializeJson(doc, json);
-  JsonArray rgbxy = doc["Rgbxy"];
+  JsonArray rgbxy = doc["D"];
 
   short red = rgbxy[0];
   short green = rgbxy[1];
