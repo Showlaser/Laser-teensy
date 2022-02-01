@@ -11,15 +11,12 @@ MCP4X dac;
 
 void turnLasersOff();
 
-Laser::Laser(int redLaserPin, int greenLaserPin, int blueLaserPin, int xGalvoFeedbackPin, int yGalvoFeedbackPin, int solenoidPin)
+Laser::Laser(int redLaserPin, int greenLaserPin, int blueLaserPin)
 {
   _quality = FROM_FLOAT(1. / (LASER_QUALITY));
   _redLaserPin = redLaserPin;
   _greenLaserPin = greenLaserPin;
   _blueLaserPin = blueLaserPin;
-  _xGalvoFeedbackPin = xGalvoFeedbackPin;
-  _yGalvoFeedbackPin = yGalvoFeedbackPin;
-  _solenoidPin = solenoidPin;
 
   _x = 0;
   _y = 0;
@@ -83,74 +80,6 @@ void Laser::setClipArea(long x, long y, long x1, long y1)
   _clipYMax = y1;
 }
 
-/**
-   @brief limits the laser power to reach below the set maxPowerInAudienceRgb.
-*/
-void Laser::limitLaserPower()
-{
-  for (int i = 0; i < 3; i++)
-  {
-    const short currentLaserPower = _currentLaserPowerRgb[i];
-    const short maxLaserPower = _maxPowerInAudienceRgb[i];
-
-    if (currentLaserPower > maxLaserPower)
-    {
-      short newPowerValue = _currentLaserPowerRgb[i];
-      while (newPowerValue > _maxPowerInAudienceRgb[i])
-      {
-        newPowerValue = abs(newPowerValue - (newPowerValue / 4));
-      }
-    }
-  }
-}
-
-int Laser::getXGalvoRealPosition()
-{
-  return analogRead(A0);
-}
-
-int Laser::getYGalvoRealPosition()
-{
-  return analogRead(A1);
-}
-
-void Laser::setSolenoid(bool state)
-{
-  digitalWrite(_solenoidPin, state);
-}
-
-/**
- * @brief sets the laser in a safe state
- * 
- */
-
-void Laser::testGalvo()
-{
-  sendTo(-4000, -4000);
-  delayMicroseconds(600);
-  int xPosition = getXGalvoRealPosition();
-  int yPosition = getYGalvoRealPosition();
-
-  sendTo(4000, 4000);
-  delayMicroseconds(600);
-  int xPosition2 = getXGalvoRealPosition();
-  int yPosition2 = getYGalvoRealPosition();
-
-  if (xPosition == xPosition2 || yPosition == yPosition2)
-  {
-    _emergencyModeActive = true;
-    _emergencyModeActiveReason = "Galvo not moving";
-  }
-}
-
-void Laser::audienceScanCheck()
-{
-  if (_yPos < 0)
-  {
-    limitLaserPower();
-  }
-}
-
 bool Laser::numberIsBetween(int value, int min, int max)
 {
   return value >= min && value <= max;
@@ -172,22 +101,13 @@ void Laser::turnLasersOff()
 }
 
 /**
-   @brief this function calls other functions to check if the laser is operating in a safe way
-
-*/
-void Laser::laserSafetyChecks()
-{
-  audienceScanCheck();
-}
-
-/**
    @brief sets the power of the lasers and checks if the new values are safe
 
    @param r the power of the red laser
    @param g the power of the green laser
    @param b the power of the blue laser
 */
-void Laser::setLaserPower(short r, short g, short b)
+void Laser::setLaserPower(int r, int g, int b)
 {
   if (_currentLaserPowerRgb[0] == r &&
       _currentLaserPowerRgb[1] == g &&
@@ -196,11 +116,13 @@ void Laser::setLaserPower(short r, short g, short b)
     return;
   }
 
+  r = fixBoundary(r, 0, 255);
+  g = fixBoundary(g, 0, 255);
+  b = fixBoundary(b, 0, 255);
+
   _currentLaserPowerRgb[0] = r;
   _currentLaserPowerRgb[1] = g;
   _currentLaserPowerRgb[2] = b;
-
-  // laserSafetyChecks();
 
   analogWrite(_redLaserPin, r);
   analogWrite(_greenLaserPin, g);
@@ -208,14 +130,14 @@ void Laser::setLaserPower(short r, short g, short b)
 }
 
 /**
-   @brief fix the input value if it goes under or over the min and max values.
+   @brief sets the input value to the max or min value if it goes under or over the min and max values.
 
    @param input the input variable to fix
    @param min the minimum allowed value
    @param max the maximum allowed value
-   @return short the value between or equal to the min or max value
+   @return int the value between or equal to the min or max value
 */
-short Laser::fixBoundary(short input, short min, short max)
+int Laser::fixBoundary(int input, int min, int max)
 {
   if (input < min)
   {
@@ -234,7 +156,7 @@ short Laser::fixBoundary(short input, short min, short max)
    @param xpos the position of the x mirror in the galvo
    @param ypos the position of the y mirror in the galvo
 */
-void Laser::sendTo(short xPos, short yPos)
+void Laser::sendTo(int xPos, int yPos)
 {
   if (xPos == _xPos &&
       yPos == _yPos)
@@ -242,15 +164,18 @@ void Laser::sendTo(short xPos, short yPos)
     return;
   }
 
-  _xPos = fixBoundary(xPos, -4000, 4000);
-  _yPos = fixBoundary(yPos, -4000, 4000);
+  int delayMicrosecondsTimeX = (_xPos > xPos ? _xPos - xPos : xPos - _xPos) / 4;
+  int delayMicrosecondsTimeY = (_yPos > yPos ? _yPos - yPos : yPos - _yPos) / 4;
+  int delayTime = delayMicrosecondsTimeX > delayMicrosecondsTimeY ? delayMicrosecondsTimeX : delayMicrosecondsTimeY;
+
+  _xPos = fixBoundary(xPos, -2000, 2000);
+  _yPos = fixBoundary(yPos, -2000, 2000);
 
   long xNew = TO_INT(_xPos * _scale) + _offsetX;
   long yNew = TO_INT(_yPos * _scale) + _offsetY;
 
   sendtoRaw(xNew, yNew);
-  //_latestGalvoMovement = millis();
-  //laserSafetyChecks(); // this function is called to check if the new position does not fall in an unsafe zone
+  delayMicroseconds(delayTime);
 }
 
 void Laser::sendtoRaw(long xNew, long yNew)

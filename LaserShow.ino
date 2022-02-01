@@ -1,14 +1,12 @@
 #include "Laser.h"
 #include <NativeEthernet.h>
 #include <ArduinoJson.h>
+#include "Settings.h"
 
 const int redLaserPin = 2;
 const int greenLaserPin = 3;
 const int blueLaserPin = 4;
-const int xGalvoFeedbackPin = A0;
-const int yGalvoFeedbackPin = A1;
-const int solenoidPin = 14;
-
+String previousMessage = "";
 byte mac[6];
 
 void teensyMAC(uint8_t *mac)
@@ -23,79 +21,102 @@ void teensyMAC(uint8_t *mac)
   }
 }
 
-Laser laser(redLaserPin, greenLaserPin, blueLaserPin, xGalvoFeedbackPin, yGalvoFeedbackPin, solenoidPin);
-IPAddress ip(192, 168, 1, 177);
-EthernetServer server(80);
+Laser laser(redLaserPin, greenLaserPin, blueLaserPin);
+Settings settings;
 
-bool alreadyConnected = false; // whether or not the client was connected previously
-bool messageStarted = false;
+EthernetClient client;
+IPAddress server;
 
-void setAnalogWriteFrequency()
-{
-  analogWriteFrequency(redLaserPin, 292968.75);
-  analogWriteFrequency(greenLaserPin, 292968.75);
-  analogWriteFrequency(blueLaserPin, 292968.75);
+void blinkLed(int onTimeMs, int offTimeMs) {
+  digitalWrite(8, HIGH);
+  delay(onTimeMs);
+  digitalWrite(8, LOW);
+  delay(offTimeMs);
 }
 
-void setInputPins()
-{
-  byte pins[6] = {xGalvoFeedbackPin, yGalvoFeedbackPin};
-  for (unsigned int i = 0; i < sizeof(pins) / sizeof(pins[0]); i++)
-  {
-    pinMode(i, INPUT);
-  }
-}
+void settingsMoment() {
+  unsigned long durationSeconds = millis() + 10000;
+  while (millis() < durationSeconds) {
+    blinkLed(100, 100);
+    String jsonSettings = Serial.readString();
+    Serial.println("jsonsettings length: " + String(jsonSettings.length()));
+    if (jsonSettings.length() == 0) {
+      continue;
+    }
 
-void setOutputPins()
-{
-  byte pins[7] = {redLaserPin, greenLaserPin, blueLaserPin, 5, 8, 9, 13};
-  for (unsigned int i = 0; i < sizeof(pins) / sizeof(pins[0]); i++)
-  {
-    pinMode(i, OUTPUT);
+    StaticJsonDocument<128> doc;
+    DeserializationError err = deserializeJson(doc, jsonSettings);
+    if (err) {
+      continue;
+    }
+
+    const char* jsonIp = doc["ip"];
+    String ip = String(jsonIp);
+    Serial.println("Settings ip is: " + ip);
+    settings.writeStringToEEPROM(0, ip);
+    Serial.println("Settings received. End of settings");
+    return;
   }
+
+  Serial.println("End of settings");
 }
 
 void setup()
 {
-  // Set the MAC address.
-  //  teensyMAC(mac);
-  //  Ethernet.begin(mac, ip);
-  //
-  //  // Check for Ethernet hardware present
-  //  if (Ethernet.hardwareStatus() == EthernetNoHardware)
-  //  {
-  //    while (true)
-  //    {
-  //      delay(1); // do nothing, no point running without Ethernet hardware
-  //    }
-  //  }
-  //  if (Ethernet.linkStatus() == LinkOFF)
-  //  {
-  //    // implement code
-  //  }
-  //
-  //  server.begin();
+  //settingsMoment();
+
+  //Set the MAC address.
+  teensyMAC(mac);
+  Ethernet.begin(mac);
+
+  // Check for Ethernet hardware present
+  if (Ethernet.hardwareStatus() == EthernetNoHardware)
+  {
+    while (true) { }
+  }
+  if (Ethernet.linkStatus() == LinkOFF)
+  {
+    // implement code
+  }
 
   laser.init();
-  laser.setScale(0.5);
+  laser.setScale(1);
   laser.setOffset(2048, 2048);
 
-  setAnalogWriteFrequency();
-  setInputPins();
-  setOutputPins();
+  laser.turnLasersOff();
+  //Serial.begin(115200);
 
-  //analogWriteFrequency(4, 292968.75);
-  //analogWriteFrequency(5, 292968.75);
-  //analogWriteFrequency(6, 292968.75);
+  pinMode(8, OUTPUT);
+  digitalWrite(8, HIGH);
 
-  //laser.turnLasersOff();
+  tryToConnectToServer();
+  digitalWrite(8, HIGH);
+}
+
+void tryToConnectToServer() {
+  const String ipFromEEPROM = settings.readStringFromEEPROM(0);
+  char firstChar = ipFromEEPROM.charAt(0);
+
+  if (firstChar == 255 || ipFromEEPROM.length() == 0) {
+    return;
+  }
+
+  server.fromString(ipFromEEPROM);
+
+  while (!client.connect(server, 50000)) {
+    blinkLed(1000, 100);
+  }
 }
 
 void executeJson(String json)
 {
-  StaticJsonDocument<64> doc;
-  deserializeJson(doc, json);
-  JsonArray rgbxy = doc["D"];
+  StaticJsonDocument<128> doc;
+  DeserializationError err = deserializeJson(doc, json);
+  if (err) {
+    Serial.println("Error");
+    return;
+  }
+  JsonArray rgbxy = doc["d"];
 
   short red = rgbxy[0];
   short green = rgbxy[1];
@@ -107,55 +128,42 @@ void executeJson(String json)
   laser.sendTo(x, y);
 }
 
-void decodeAndExecuteCommands(EthernetClient client)
+
+void decodeAndExecuteCommands()
 {
   String json = "";
-  while (client.available() > 0)
-  {
+
+  while (client.available()) {
     char receivedCharacter = client.read();
+
     switch (receivedCharacter)
     {
-    case '{':
-      messageStarted = true;
-      break;
-    case '}':
-      messageStarted = false;
-      executeJson(json);
-      json = "";
-      break;
-    default:
-      json += receivedCharacter;
-      break;
+      case '{':
+        json += receivedCharacter;
+        break;
+      case '}':
+        json += receivedCharacter;
+        executeJson(json);
+        json = "";
+        break;
+      default:
+        json += receivedCharacter;
+        break;
     }
   }
-}
 
-void handleEthernetServer()
-{
-  EthernetClient client = server.available();
-  if (client)
-  {
-    while (client.connected())
-    {
-      decodeAndExecuteCommands(client);
-    }
-
-    client.stop();
-  }
+  laser.turnLasersOff();
 }
 
 void loop()
 {
-  //  laser.executeIntervalChecks();
-  //  if (laser.emergencyModeActive())
-  //  {
-  //    laser.executeIntervalChecks();
-  //    return;
-  //  }
-  //
-  //  handleEthernetServer();
-  laser.sendTo(-4000, -4000);
-  delay(2000);
-  laser.sendTo(4000, 4000);
-  delay(2000);
+  if (client.connected())
+  {
+    digitalWrite(8, HIGH);
+    decodeAndExecuteCommands();
+  }
+  else {
+    client.stop();
+    tryToConnectToServer();
+  }
 }

@@ -98,7 +98,7 @@ float MCP4X::getVoltageMV(byte chan) {
 }
 
 // Called by the output* set of functions.
-void MCP4X::output2(unsigned short data_A, unsigned short data_B) {
+void MCP4X::output2(unsigned int data_A, unsigned int data_B) {
 
   this->output(MCP4X_CHAN_A, data_A);
   this->output(MCP4X_CHAN_B, data_B);
@@ -108,10 +108,10 @@ void MCP4X::output2(unsigned short data_A, unsigned short data_B) {
   }
 }
 
-void MCP4X::output(byte chan, unsigned short data) {
+void MCP4X::output(byte chan, unsigned int data) {
   //	unsigned int out;
 
-  const unsigned short maxval = (1 << bitwidth) - 1;
+  const unsigned int maxval = (1 << bitwidth) - 1;
 
   chan &= 0x1;
 

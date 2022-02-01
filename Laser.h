@@ -27,25 +27,25 @@
 // define this to flip along the x axis
 //#define LASER_FLIP_X
 // define this to flip along the y axis
-//#define LASER_SWAP_XY
-#define LASER_FLIP_X
-#define LASER_FLIP_X
+#define LASER_SWAP_XY
+//#define LASER_FLIP_X
+#define LASER_FLIP_Y
 
 //! Encapsulates the laser movement and on/off state.
 class Laser
 {
 public:
-  Laser(int redLaserPin, int greenLaserPin, int blueLaserPin, int xGalvoFeedbackPin, int yGalvoFeedbackPin, int solenoidPin);
+  Laser(int redLaserPin, int greenLaserPin, int blueLaserPin);
 
   void init();
 
   //! send the laser to the given position, scaled and translated and line clipped.
-  void sendTo(short x, short y);
+  void sendTo(int x, int y);
   //! sends the laser to the raw position (the movement is always linearly interpolated depending on the quality,
   //! to avoid too fast movements.
   void sendtoRaw(long x, long y);
-
-  void setLaserPower(short red, short green, short blue);
+  
+  void setLaserPower(int red, int green, int blue);
   void turnLasersOff();
 
   void setScale(float scale);
@@ -53,8 +53,6 @@ public:
 
   void resetClipArea();
   void setClipArea(long x, long y, long x1, long y1);
-
-  void testGalvo();
 
   void resetMaxMove()
   {
@@ -89,54 +87,30 @@ public:
   {
     _zDist = dist;
   }
-
-  bool emergencyModeActive()
-  {
-    return _emergencyModeActive;
-  }
-
+  
 private:
   //! computes the out code for line clipping
   int computeOutCode(long x, long y);
-  int getXGalvoRealPosition();
-  int getYGalvoRealPosition();
   //! returns if the line should be drawn, clips line to clip area
-  bool galvoIsMoving();
   bool numberIsBetween(int value, int min, int max);
   bool clipLine(long &x0, long &y0, long &x1, long &y1);
 
   //! send X/Y to DAC
   void sendToDAC(int x, int y);
   void limitLaserPower();
-  void setSolenoid(bool state);
-  void laserSafetyChecks();
-  void audienceScanCheck();
 
-  short fixBoundary(short input, short min, short max);
+  int fixBoundary(int input, int min, int max);
 
-  bool _emergencyModeActive = false;
-  String _emergencyModeActiveReason = "";
-  short _currentLaserPowerRgb[3] = {0, 0, 0};           // rgb
-  const short _maxPowerInAudienceRgb[3] = {25, 25, 25}; // rgb
+  int _currentLaserPowerRgb[3] = {0, 0, 0};           // rgb
+  const int _maxPowerInAudienceRgb[3] = {25, 25, 25}; // rgb
 
   int _redLaserPin = 0;
   int _greenLaserPin = 0;
   int _blueLaserPin = 0;
-  int _xGalvoFeedbackPin = 0;
-  int _yGalvoFeedbackPin = 0;
   int _solenoidPin = 0;
 
-  unsigned long _previousInterval;
-  unsigned long _latestGalvoMovement;
-
-  unsigned long _previousMillis;
-
-  short _yPos = 0;
-  short _xPos = 0;
-
-  // values from the feedback signal of the galvo
-  short _realYPos = 0;
-  short _realXPos = 0;
+  int _yPos = 0;
+  int _xPos = 0;
 
   FIXPT _quality;
 
