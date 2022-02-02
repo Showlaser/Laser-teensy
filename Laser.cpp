@@ -164,9 +164,12 @@ void Laser::sendTo(int xPos, int yPos)
     return;
   }
 
-  int delayMicrosecondsTimeX = (_xPos > xPos ? _xPos - xPos : xPos - _xPos) / 4;
-  int delayMicrosecondsTimeY = (_yPos > yPos ? _yPos - yPos : yPos - _yPos) / 4;
+  int delayMicrosecondsTimeX = (_xPos > xPos ? _xPos - xPos : xPos - _xPos) / 2.5;
+  int delayMicrosecondsTimeY = (_yPos > yPos ? _yPos - yPos : yPos - _yPos) / 2.5;
   int delayTime = delayMicrosecondsTimeX > delayMicrosecondsTimeY ? delayMicrosecondsTimeX : delayMicrosecondsTimeY;
+  if (delayTime < 350) {
+    delayTime = 350;
+  }
 
   _xPos = fixBoundary(xPos, -2000, 2000);
   _yPos = fixBoundary(yPos, -2000, 2000);

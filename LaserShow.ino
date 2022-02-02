@@ -63,7 +63,7 @@ void settingsMoment() {
 
 void setup()
 {
-  //settingsMoment();
+  settingsMoment();
 
   //Set the MAC address.
   teensyMAC(mac);
