@@ -84,7 +84,7 @@ void setup()
   laser.setOffset(2048, 2048);
 
   laser.turnLasersOff();
-  //Serial.begin(115200);
+  Serial.begin(115200);
 
   pinMode(8, OUTPUT);
   digitalWrite(8, HIGH);
@@ -113,7 +113,6 @@ void executeJson(String json)
   StaticJsonDocument<128> doc;
   DeserializationError err = deserializeJson(doc, json);
   if (err) {
-    Serial.println("Error");
     return;
   }
   JsonArray rgbxy = doc["d"];
@@ -135,7 +134,6 @@ void decodeAndExecuteCommands()
 
   while (client.available()) {
     char receivedCharacter = client.read();
-
     switch (receivedCharacter)
     {
       case '{':
@@ -144,6 +142,7 @@ void decodeAndExecuteCommands()
       case '}':
         json += receivedCharacter;
         executeJson(json);
+        client.write('d');
         json = "";
         break;
       default:
