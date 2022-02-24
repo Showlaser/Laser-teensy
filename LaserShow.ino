@@ -80,7 +80,7 @@ void setup()
   }
 
   laser.init();
-  laser.setScale(1);
+  laser.setScale(0.5);
   laser.setOffset(2048, 2048);
 
   laser.turnLasersOff();
