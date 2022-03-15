@@ -168,6 +168,7 @@ void loop()
     decodeAndExecuteCommands();
   }
   else {
+    laser.turnLasersOff();
     client.stop();
     tryToConnectToServer();
   }
