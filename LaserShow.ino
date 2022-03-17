@@ -64,6 +64,7 @@ void settingsMoment() {
 
 void setup()
 {
+  Serial.begin(115200);
   settingsMoment();
 
   //Set the MAC address.
@@ -85,7 +86,6 @@ void setup()
   laser.setOffset(2048, 2048);
 
   laser.turnLasersOff();
-  Serial.begin(115200);
 
   pinMode(8, OUTPUT);
   digitalWrite(8, HIGH);
