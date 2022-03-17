@@ -170,8 +170,11 @@ void Laser::sendTo(int xPos, int yPos)
   int delayMicrosecondsTimeX = (_xPos > xPos ? _xPos - xPos : xPos - _xPos) / 2.5;
   int delayMicrosecondsTimeY = (_yPos > yPos ? _yPos - yPos : yPos - _yPos) / 2.5;
   int delayTime = delayMicrosecondsTimeX > delayMicrosecondsTimeY ? delayMicrosecondsTimeX : delayMicrosecondsTimeY;
-  if (delayTime < 350) {
-    delayTime = 350;
+  if (delayTime < 50) {
+    delayTime = 50;
+  }
+  if (delayTime > 999) {
+    delayTime = 999;
   }
 
   _xPos = xPos;

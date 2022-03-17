@@ -8,6 +8,7 @@ const int greenLaserPin = 3;
 const int blueLaserPin = 4;
 String previousMessage = "";
 byte mac[6];
+unsigned long previousMillis;
 
 void teensyMAC(uint8_t *mac)
 {
@@ -123,8 +124,8 @@ void executeJson(String json)
   short x = rgbxy[3];
   short y = rgbxy[4];
 
-  laser.setLaserPower(red, green, blue);
   laser.sendTo(x, y);
+  laser.setLaserPower(red, green, blue);
 }
 
 
@@ -134,6 +135,8 @@ void decodeAndExecuteCommands()
 
   while (client.available()) {
     char receivedCharacter = client.read();
+    previousMillis = millis();
+
     switch (receivedCharacter)
     {
       case '{':
@@ -151,7 +154,10 @@ void decodeAndExecuteCommands()
     }
   }
 
-  laser.turnLasersOff();
+  if (millis() - previousMillis > 2) {
+    laser.turnLasersOff();
+    previousMillis = millis();
+  }
 }
 
 void loop()
@@ -162,6 +168,7 @@ void loop()
     decodeAndExecuteCommands();
   }
   else {
+    laser.turnLasersOff();
     client.stop();
     tryToConnectToServer();
   }
