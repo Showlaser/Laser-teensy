@@ -115,6 +115,15 @@ void Laser::setLaserPower(int r, int g, int b)
   {
     return;
   }
+  if (r > 12) {
+    r = 12;
+  }
+  if (g > 12) {
+    g = 12;
+  }
+  if (b > 12) {
+    b = 12;
+  }
 
   r = fixBoundary(r, 0, 255);
   g = fixBoundary(g, 0, 255);
