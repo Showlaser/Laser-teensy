@@ -115,14 +115,14 @@ void Laser::setLaserPower(int r, int g, int b)
   {
     return;
   }
-  if (r > 12) {
-    r = 12;
+  if (r > 7) {
+    r = 7;
   }
-  if (g > 12) {
-    g = 12;
+  if (g > 7) {
+    g = 7;
   }
-  if (b > 12) {
-    b = 12;
+  if (b > 7) {
+    b = 7;
   }
 
   r = fixBoundary(r, 0, 255);
@@ -167,12 +167,6 @@ int Laser::fixBoundary(int input, int min, int max)
 */
 void Laser::sendTo(int xPos, int yPos)
 {
-  if (xPos == _xPos &&
-      yPos == _yPos)
-  {
-    return;
-  }
-
   xPos = fixBoundary(xPos, -4000, 4000);
   yPos = fixBoundary(yPos, -4000, 4000);
 
