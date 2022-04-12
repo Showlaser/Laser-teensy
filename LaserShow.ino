@@ -111,42 +111,43 @@ void tryToConnectToServer() {
 
 void executeJson(String json)
 {
-  StaticJsonDocument<128> doc;
+  StaticJsonDocument<8192> doc;
   DeserializationError err = deserializeJson(doc, json);
   if (err) {
+    Serial.println(err.f_str());
     return;
   }
-  JsonArray rgbxy = doc["d"];
 
-  short red = rgbxy[0];
-  short green = rgbxy[1];
-  short blue = rgbxy[2];
-  short x = rgbxy[3];
-  short y = rgbxy[4];
+  for (JsonObject item : doc.as<JsonArray>()) {
+    int red = item["r"];
+    int green = item["g"];
+    int blue = item["b"];
+    int x = item["x"];
+    int y = item["y"];
 
-  laser.sendTo(x, y);
-  laser.setLaserPower(red, green, blue);
+    laser.sendTo(x, y);
+    laser.setLaserPower(red, green, blue);
+  }
 }
 
+String json = "";
 
 void decodeAndExecuteCommands()
 {
-  String json = "";
-
   while (client.available()) {
     char receivedCharacter = client.read();
     previousMillis = millis();
 
     switch (receivedCharacter)
     {
-      case '{':
+      case '[':
+        json = "";
         json += receivedCharacter;
         break;
-      case '}':
+      case ']':
         json += receivedCharacter;
         executeJson(json);
         client.write('d');
-        json = "";
         break;
       default:
         json += receivedCharacter;
