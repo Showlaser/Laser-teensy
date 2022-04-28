@@ -115,16 +115,7 @@ void Laser::setLaserPower(int r, int g, int b)
   {
     return;
   }
-  if (r > 7) {
-    r = 7;
-  }
-  if (g > 7) {
-    g = 7;
-  }
-  if (b > 7) {
-    b = 7;
-  }
-
+  
   r = fixBoundary(r, 0, 255);
   g = fixBoundary(g, 0, 255);
   b = fixBoundary(b, 0, 255);
