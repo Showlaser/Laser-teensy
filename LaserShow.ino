@@ -62,10 +62,16 @@ void settingsMoment() {
   Serial.println("End of settings");
 }
 
+void setPwmFrequency() {
+  analogWriteFrequency(2, 300000);
+  analogWriteFrequency(3, 300000);
+  analogWriteFrequency(4, 300000);
+}
+
 void setup()
 {
   settingsMoment();
-
+  setPwmFrequency();
   //Set the MAC address.
   teensyMAC(mac);
   Ethernet.begin(mac);
@@ -75,11 +81,7 @@ void setup()
   {
     while (true) { }
   }
-  if (Ethernet.linkStatus() == LinkOFF)
-  {
-    // implement code
-  }
-
+ 
   laser.init();
   laser.setScale(0.5);
   laser.setOffset(2048, 2048);
