@@ -9,10 +9,6 @@ const int blueLaserPin = 4;
 String previousMessage = "";
 byte mac[6];
 unsigned long previousMillis;
-
-JsonArray messagesToPlay;
-int patternDurationInMilliseconds = 0;
-unsigned long timePatternShouldStop = 0;
 bool stopCommandReceived = false;
 
 void teensyMAC(uint8_t *mac)
@@ -125,27 +121,25 @@ void deserializeJsonString(String jsonString)
     return;
   }
 
-  stopCommandReceived = doc["Stop"];
-  int durationTime = doc["DurationInMilliseconds"];
-  timePatternShouldStop = millis() + durationTime;
-  messagesToPlay = doc["Messages"].as<JsonArray>();
-}
+  stopCommandReceived = doc["sp"];
+  long durationTime = doc["dms"];
+  unsigned long timePatternShouldStop = millis() + durationTime;
+  JsonArray array = doc["m"].as<JsonArray>();
 
-void executePattern() {
-  if (millis() > timePatternShouldStop || messagesToPlay.size() == 0 || stopCommandReceived) {
-    return;
+  while (millis() < timePatternShouldStop) {
+    for (JsonObject item : array) {
+      int red = item["r"];
+      int green = item["g"];
+      int blue = item["b"];
+      int x = item["x"];
+      int y = item["y"];
+
+      laser.sendTo(x, y);
+      laser.setLaserPower(red, green, blue);
+    }
   }
 
-  for (JsonObject Message : messagesToPlay) {
-    int red = Message["r"];
-    int green = Message["g"];
-    int blue = Message["b"];
-    int x = Message["x"];
-    int y = Message["y"];
-
-    laser.sendTo(x, y);
-    laser.setLaserPower(red, green, blue);
-  }
+  laser.turnLasersOff();
 }
 
 void decodeCommands()
@@ -157,13 +151,12 @@ void decodeCommands()
 
     switch (receivedCharacter)
     {
-      case '[':
+      case '(':
         json = "";
-        json += receivedCharacter;
         break;
-      case ']':
-        json += receivedCharacter;
+      case ')':
         deserializeJsonString(json);
+        json = "";
         break;
       default:
         json += receivedCharacter;
@@ -183,7 +176,6 @@ void loop()
   {
     digitalWrite(8, HIGH);
     decodeCommands();
-    executePattern();
   }
   else {
     laser.turnLasersOff();
