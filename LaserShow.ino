@@ -10,6 +10,11 @@ String previousMessage = "";
 byte mac[6];
 unsigned long previousMillis;
 
+JsonArray messagesToPlay;
+int patternDurationInMilliseconds = 0;
+unsigned long timePatternShouldStop = 0;
+bool stopCommandReceived = false;
+
 void teensyMAC(uint8_t *mac)
 {
   for (uint8_t by = 0; by < 2; by++)
@@ -81,7 +86,7 @@ void setup()
   {
     while (true) { }
   }
- 
+
   laser.init();
   laser.setScale(0.5);
   laser.setOffset(2048, 2048);
@@ -111,31 +116,41 @@ void tryToConnectToServer() {
   }
 }
 
-void executeJson(String json)
+void deserializeJsonString(String jsonString)
 {
   StaticJsonDocument<8192> doc;
-  DeserializationError err = deserializeJson(doc, json);
+  DeserializationError err = deserializeJson(doc, jsonString);
   if (err) {
     Serial.println(err.f_str());
     return;
   }
 
-  for (JsonObject item : doc.as<JsonArray>()) {
-    int red = item["r"];
-    int green = item["g"];
-    int blue = item["b"];
-    int x = item["x"];
-    int y = item["y"];
+  stopCommandReceived = doc["Stop"];
+  int durationTime = doc["DurationInMilliseconds"];
+  timePatternShouldStop = millis() + durationTime;
+  messagesToPlay = doc["Messages"].as<JsonArray>();
+}
+
+void executePattern() {
+  if (millis() > timePatternShouldStop || messagesToPlay.size() == 0 || stopCommandReceived) {
+    return;
+  }
+
+  for (JsonObject Message : messagesToPlay) {
+    int red = Message["r"];
+    int green = Message["g"];
+    int blue = Message["b"];
+    int x = Message["x"];
+    int y = Message["y"];
 
     laser.sendTo(x, y);
     laser.setLaserPower(red, green, blue);
   }
 }
 
-String json = "";
-
-void decodeAndExecuteCommands()
+void decodeCommands()
 {
+  String json = "";
   while (client.available()) {
     char receivedCharacter = client.read();
     previousMillis = millis();
@@ -148,8 +163,7 @@ void decodeAndExecuteCommands()
         break;
       case ']':
         json += receivedCharacter;
-        executeJson(json);
-        client.write('d');
+        deserializeJsonString(json);
         break;
       default:
         json += receivedCharacter;
@@ -168,7 +182,8 @@ void loop()
   if (client.connected())
   {
     digitalWrite(8, HIGH);
-    decodeAndExecuteCommands();
+    decodeCommands();
+    executePattern();
   }
   else {
     laser.turnLasersOff();
