@@ -2,14 +2,25 @@
 #include <NativeEthernet.h>
 #include <ArduinoJson.h>
 #include "Settings.h"
+#include <queue>
 
 const int redLaserPin = 2;
 const int greenLaserPin = 3;
 const int blueLaserPin = 4;
 String previousMessage = "";
-byte mac[6];
 unsigned long previousMillis;
 bool stopCommandReceived = false;
+
+struct laserMessage {
+  int redLaserPower;
+  int greenLaserPower;
+  int blueLaserPower;
+  int x;
+  int y;
+};
+
+std::queue<laserMessage> laserMessages;
+unsigned long timePatternShouldStop;
 
 void teensyMAC(uint8_t *mac)
 {
@@ -74,6 +85,7 @@ void setup()
   settingsMoment();
   setPwmFrequency();
   //Set the MAC address.
+  byte mac[6];
   teensyMAC(mac);
   Ethernet.begin(mac);
 
@@ -123,23 +135,19 @@ void deserializeJsonString(String jsonString)
 
   stopCommandReceived = doc["sp"];
   long durationTime = doc["dms"];
-  unsigned long timePatternShouldStop = millis() + durationTime;
-  JsonArray array = doc["m"].as<JsonArray>();
+  timePatternShouldStop = millis() + durationTime;
+  JsonArray jsonArray = doc["m"].as<JsonArray>();
 
-  while (millis() < timePatternShouldStop) {
-    for (JsonObject item : array) {
-      int red = item["r"];
-      int green = item["g"];
-      int blue = item["b"];
-      int x = item["x"];
-      int y = item["y"];
+  for (JsonObject item : jsonArray) {
+    laserMessage message;
+    message.redLaserPower = item["r"];
+    message.greenLaserPower = item["g"];
+    message.blueLaserPower = item["b"];
+    message.x = item["x"];
+    message.y = item["y"];
 
-      laser.sendTo(x, y);
-      laser.setLaserPower(red, green, blue);
-    }
+    laserMessages.push(message);
   }
-
-  laser.turnLasersOff();
 }
 
 void decodeCommands()
@@ -152,9 +160,11 @@ void decodeCommands()
     switch (receivedCharacter)
     {
       case '(':
+        clearMessageQueue();
         json = "";
         break;
       case ')':
+        clearMessageQueue();
         deserializeJsonString(json);
         json = "";
         break;
@@ -163,11 +173,30 @@ void decodeCommands()
         break;
     }
   }
+}
 
-  if (millis() - previousMillis > 2) {
+void clearMessageQueue() {
+  std::queue<laserMessage> empty;
+  std::swap(laserMessages, empty);
+}
+
+void executeMessages() {
+  bool messagesCannotBeExecuted = timePatternShouldStop < millis() || laserMessages.empty() || stopCommandReceived;
+  if (messagesCannotBeExecuted) {
     laser.turnLasersOff();
-    previousMillis = millis();
+
+    if (!laserMessages.empty()) {
+      clearMessageQueue();
+    }
+    return;
   }
+
+  laserMessage message = laserMessages.front();
+  laserMessages.pop();
+  laserMessages.push(message);
+
+  laser.sendTo(message.x, message.y);
+  laser.setLaserPower(message.redLaserPower, message.greenLaserPower, message.blueLaserPower);
 }
 
 void loop()
@@ -176,6 +205,7 @@ void loop()
   {
     digitalWrite(8, HIGH);
     decodeCommands();
+    executeMessages();
   }
   else {
     laser.turnLasersOff();
