@@ -2,13 +2,25 @@
 #include <NativeEthernet.h>
 #include <ArduinoJson.h>
 #include "Settings.h"
+#include <queue>
 
 const int redLaserPin = 2;
 const int greenLaserPin = 3;
 const int blueLaserPin = 4;
 String previousMessage = "";
-byte mac[6];
 unsigned long previousMillis;
+bool stopCommandReceived = false;
+
+struct laserMessage {
+  int redLaserPower;
+  int greenLaserPower;
+  int blueLaserPower;
+  int x;
+  int y;
+};
+
+std::queue<laserMessage> laserMessages;
+unsigned long timePatternShouldStop;
 
 void teensyMAC(uint8_t *mac)
 {
@@ -63,9 +75,9 @@ void settingsMoment() {
 }
 
 void setPwmFrequency() {
-  analogWriteFrequency(2, 300000);
-  analogWriteFrequency(3, 300000);
-  analogWriteFrequency(4, 300000);
+  analogWriteFrequency(2, 150000);
+  analogWriteFrequency(3, 150000);
+  analogWriteFrequency(4, 150000);
 }
 
 void setup()
@@ -73,6 +85,7 @@ void setup()
   settingsMoment();
   setPwmFrequency();
   //Set the MAC address.
+  byte mac[6];
   teensyMAC(mac);
   Ethernet.begin(mac);
 
@@ -81,7 +94,7 @@ void setup()
   {
     while (true) { }
   }
- 
+
   laser.init();
   laser.setScale(0.5);
   laser.setOffset(2048, 2048);
@@ -111,56 +124,79 @@ void tryToConnectToServer() {
   }
 }
 
-void executeJson(String json)
+void deserializeJsonString(String jsonString)
 {
-  StaticJsonDocument<8192> doc;
-  DeserializationError err = deserializeJson(doc, json);
+  StaticJsonDocument<16384> doc;
+  DeserializationError err = deserializeJson(doc, jsonString);
   if (err) {
     Serial.println(err.f_str());
     return;
   }
 
-  for (JsonObject item : doc.as<JsonArray>()) {
-    int red = item["r"];
-    int green = item["g"];
-    int blue = item["b"];
-    int x = item["x"];
-    int y = item["y"];
+  stopCommandReceived = doc["sp"];
+  long durationTime = doc["dms"];
+  timePatternShouldStop = millis() + durationTime;
+  JsonArray jsonArray = doc["m"].as<JsonArray>();
 
-    laser.sendTo(x, y);
-    laser.setLaserPower(red, green, blue);
+  for (JsonObject item : jsonArray) {
+    laserMessage message;
+    message.redLaserPower = item["r"];
+    message.greenLaserPower = item["g"];
+    message.blueLaserPower = item["b"];
+    message.x = item["x"];
+    message.y = item["y"];
+
+    laserMessages.push(message);
   }
 }
 
-String json = "";
-
-void decodeAndExecuteCommands()
+void decodeCommands()
 {
+  String json = "";
   while (client.available()) {
     char receivedCharacter = client.read();
     previousMillis = millis();
 
     switch (receivedCharacter)
     {
-      case '[':
+      case '(':
+        clearMessageQueue();
         json = "";
-        json += receivedCharacter;
         break;
-      case ']':
-        json += receivedCharacter;
-        executeJson(json);
-        client.write('d');
+      case ')':
+        clearMessageQueue();
+        deserializeJsonString(json);
+        json = "";
         break;
       default:
         json += receivedCharacter;
         break;
     }
   }
+}
 
-  if (millis() - previousMillis > 2) {
+void clearMessageQueue() {
+  std::queue<laserMessage> empty;
+  std::swap(laserMessages, empty);
+}
+
+void executeMessages() {
+  bool messagesCannotBeExecuted = timePatternShouldStop < millis() || laserMessages.empty() || stopCommandReceived;
+  if (messagesCannotBeExecuted) {
     laser.turnLasersOff();
-    previousMillis = millis();
+
+    if (!laserMessages.empty()) {
+      clearMessageQueue();
+    }
+    return;
   }
+
+  laserMessage message = laserMessages.front();
+  laserMessages.pop();
+  laserMessages.push(message);
+
+  laser.sendTo(message.x, message.y);
+  laser.setLaserPower(message.redLaserPower, message.greenLaserPower, message.blueLaserPower);
 }
 
 void loop()
@@ -168,7 +204,8 @@ void loop()
   if (client.connected())
   {
     digitalWrite(8, HIGH);
-    decodeAndExecuteCommands();
+    decodeCommands();
+    executeMessages();
   }
   else {
     laser.turnLasersOff();

@@ -121,9 +121,9 @@ void Laser::setLaserPower(int r, int g, int b)
   b = fixBoundary(b, 0, 255);
 
   // handling the pwm frequency range
-  r = map(r, 0, 255, 70, 255);
-  g = map(g, 0, 255, 70, 255);
-  b = map(b, 0, 255, 70, 255);
+  if (r > 0) r = map(r, 0, 255, 65, 255);
+  if (g > 0) g = map(g, 0, 255, 65, 255);
+  if (b > 0) b = map(b, 0, 255, 55, 255);
 
   _currentLaserPowerRgb[0] = r;
   _currentLaserPowerRgb[1] = g;
@@ -166,14 +166,14 @@ void Laser::sendTo(int xPos, int yPos)
   xPos = fixBoundary(xPos, -4000, 4000);
   yPos = fixBoundary(yPos, -4000, 4000);
 
-  int delayMicrosecondsTimeX = (_xPos > xPos ? _xPos - xPos : xPos - _xPos) / 3.5;
-  int delayMicrosecondsTimeY = (_yPos > yPos ? _yPos - yPos : yPos - _yPos) / 3.5;
+  int delayMicrosecondsTimeX = (_xPos > xPos ? _xPos - xPos : xPos - _xPos) / 3;
+  int delayMicrosecondsTimeY = (_yPos > yPos ? _yPos - yPos : yPos - _yPos) / 3;
   int delayTime = delayMicrosecondsTimeX > delayMicrosecondsTimeY ? delayMicrosecondsTimeX : delayMicrosecondsTimeY;
   if (delayTime < 25) {
     delayTime = 25;
   }
-  if (delayTime > 800) {
-    delayTime = 800;
+  if (delayTime > 1000) {
+    delayTime = 1000;
   }
 
   _xPos = xPos;
