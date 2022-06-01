@@ -121,9 +121,9 @@ void Laser::setLaserPower(int r, int g, int b)
   b = fixBoundary(b, 0, 255);
 
   // handling the pwm frequency range
-  if (r > 0) r = map(r, 0, 255, 90, 255);
-  if (g > 0) g = map(g, 0, 255, 90, 255);
-  if (b > 0) b = map(b, 0, 255, 90, 255);
+  if (r > 0) r = map(r, 0, 255, 65, 255);
+  if (g > 0) g = map(g, 0, 255, 65, 255);
+  if (b > 0) b = map(b, 0, 255, 55, 255);
 
   _currentLaserPowerRgb[0] = r;
   _currentLaserPowerRgb[1] = g;

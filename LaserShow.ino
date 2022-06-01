@@ -75,9 +75,9 @@ void settingsMoment() {
 }
 
 void setPwmFrequency() {
-  analogWriteFrequency(2, 300000);
-  analogWriteFrequency(3, 300000);
-  analogWriteFrequency(4, 300000);
+  analogWriteFrequency(2, 150000);
+  analogWriteFrequency(3, 150000);
+  analogWriteFrequency(4, 150000);
 }
 
 void setup()
@@ -126,7 +126,7 @@ void tryToConnectToServer() {
 
 void deserializeJsonString(String jsonString)
 {
-  StaticJsonDocument<8192> doc;
+  StaticJsonDocument<16384> doc;
   DeserializationError err = deserializeJson(doc, jsonString);
   if (err) {
     Serial.println(err.f_str());
