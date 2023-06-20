@@ -141,11 +141,11 @@ int Laser::fixBoundary(int input, int min, int max)
 {
   if (input < min)
   {
-    input = min;
+    return min;
   }
   if (input > max)
   {
-    max = max;
+    return max;
   }
   return input;
 }
